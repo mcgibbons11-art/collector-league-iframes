@@ -25,7 +25,7 @@
     ".cl-card .spk{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(1.6px 1.6px at 22% 28%,#fff,transparent),radial-gradient(1.6px 1.6px at 68% 58%,#fff,transparent),radial-gradient(2px 2px at 45% 82%,#fff,transparent),radial-gradient(1.4px 1.4px at 82% 22%,#fff,transparent);animation:clspk 3s ease-in-out infinite}",
     "@keyframes clspk{0%,100%{opacity:0}50%{opacity:.95}}",
     ".cl-card .ov{position:absolute;z-index:3;font-family:'Baloo 2';font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.55)}",
-    ".cl-card .ov.rar{top:7px;left:7px;font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.5);border:1px solid var(--rar,#888);border-radius:8px;padding:2px 8px}",
+    ".cl-card .ov.rar{top:7px;left:7px;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.6);border:1px solid var(--rar,#888);border-radius:8px;padding:2px 8px}",
     ".cl-card .ov.grd{top:7px;right:7px;font-size:10px;color:#fff;background:rgba(0,0,0,.55);border-radius:8px;padding:2px 7px}",
     ".cl-card .ov.val{bottom:8px;left:50%;transform:translateX(-50%);font-size:15px;color:#3a2600;background:linear-gradient(#ffe07a,#e0922a);border-radius:10px;padding:3px 13px;box-shadow:0 2px 7px rgba(0,0,0,.35);text-shadow:none;white-space:nowrap}",
     ".cl-card .ov.cap{bottom:8px;left:7px;right:7px;text-align:center;font-size:12px;color:#fff;background:rgba(0,0,0,.45);border-radius:8px;padding:3px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
