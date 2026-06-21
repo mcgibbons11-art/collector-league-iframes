@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  Collector League — Rip Night HOST CONSOLE (Portals iframe / admin route)
+  ---------------------------------------------------------------------------
+  Operator surface for running a live show (plan 5.7). Bright Pokemon-accent
+  palette on a control-room navy. THIS IS A UI SHELL: every button here would
+  call a protected backend admin route (POST /v1/admin/contests/:id/...). The
+  backend enforces the state machine + step-up auth; nothing here is authoritative.
+  Destructive actions (FINALIZE, EMERGENCY STOP) require an explicit confirm.
+-->
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Collector League — Host Console</title>
+<script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+<style>
+  :root{ --red:#E3350D; --blue:#3B9DF0; --yellow:#FFCB05; --green:#3DBE5A; --pink:#EE5577;
+    --ink:#0B1020; --ink2:#141C33; --line:rgba(255,255,255,.1); }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--ink);color:#fff;font-family:'Trebuchet MS','Segoe UI',sans-serif;}
+  .top{display:flex;align-items:center;gap:12px;padding:12px 18px;background:linear-gradient(90deg,var(--red),#8e1d07);border-bottom:3px solid #fff;}
+  .top .ball{width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 50% 38%,#fff 0 32%,var(--yellow) 33% 100%);border:3px solid #fff;}
+  .top h1{font-size:16px;margin:0;font-weight:900;letter-spacing:1px;}
+  .top h1 small{display:block;font-size:9px;letter-spacing:3px;opacity:.9;}
+  .phase{margin-left:auto;font-weight:900;letter-spacing:2px;padding:6px 14px;border-radius:11px;background:var(--green);color:#06250f;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px;}
+  .card{background:var(--ink2);border:2px solid var(--line);border-radius:16px;padding:14px;}
+  .card h2{margin:0 0 10px;font-size:12px;letter-spacing:2px;color:var(--yellow);text-transform:uppercase;}
+  .stat{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed var(--line);font-size:13px;}
+  .stat b{font-variant-numeric:tabular-nums;}
+  .slate{max-height:150px;overflow:auto;}
+  .memo{display:flex;align-items:center;gap:8px;font-size:12px;padding:5px 6px;border-radius:8px;margin:3px 0;background:rgba(255,255,255,.04);}
+  .memo .id{font-family:monospace;opacity:.8;}
+  .pill{margin-left:auto;font-size:10px;font-weight:800;padding:2px 8px;border-radius:8px;}
+  .pill.ok{background:var(--green);color:#06250f;} .pill.go{background:var(--blue);} .pill.wait{background:#6b7592;} .pill.done{background:var(--yellow);color:#3a2a00;}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;}
+  button{cursor:pointer;border:0;border-radius:11px;padding:11px 14px;font-weight:800;font-size:13px;color:#fff;background:#33405e;box-shadow:0 4px 0 rgba(0,0,0,.3);}
+  button:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.3);}
+  .b-go{background:linear-gradient(180deg,var(--green),#28924a);} .b-info{background:linear-gradient(180deg,var(--blue),#2f7fce);}
+  .b-warn{background:linear-gradient(180deg,var(--yellow),#d9a900);color:#3a2a00;} .b-stop{background:linear-gradient(180deg,var(--red),#8e1d07);}
+  .log{font-family:monospace;font-size:11px;color:#9fb0d6;background:#070b16;border-radius:10px;padding:8px;max-height:110px;overflow:auto;border:1px solid var(--line);}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="ball"></div>
+    <h1>HOST CONSOLE<small>RIP NIGHT &middot; COLLECTOR LEAGUE</small></h1>
+    <div class="phase" id="phase">LIVE</div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Contest Health</h2>
+      <div class="stat"><span>Contest</span><b>rip-night-014</b></div>
+      <div class="stat"><span>Connected clients</span><b id="clients">37</b></div>
+      <div class="stat"><span>Provider latency p95</span><b id="lat">240 ms</b></div>
+      <div class="stat"><span>Sequence</span><b id="seq">18</b></div>
+      <div class="stat"><span>Valid events</span><b id="valid">8 / 20</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Integrity</h2>
+      <div class="stat"><span>Machine snapshot</span><b>sha256:7c1a…</b></div>
+      <div class="stat"><span>Slate commitment</span><b>sha256:b9f2…</b></div>
+      <div class="stat"><span>Locked rosters</span><b>72</b></div>
+      <div class="stat"><span>VRF verified</span><b id="vrf">8 / 8</b></div>
+      <div class="stat"><span>Quarantined</span><b>0</b></div>
+    </div>
+
+    <div class="card">
+      <h2>Pack Slate</h2>
+      <div class="slate" id="slate"></div>
+    </div>
+
+    <div class="card">
+      <h2>Reveal Control</h2>
+      <div class="controls">
+        <button class="b-go" data-cmd="start" data-phase="3">START</button>
+        <button class="b-warn" data-cmd="pause" data-phase="4">PAUSE</button>
+        <button class="b-go" data-cmd="resume" data-phase="3">RESUME</button>
+        <button class="b-info" data-cmd="open-next">OPEN NEXT</button>
+        <button class="b-info" data-cmd="auto-open">AUTO-OPEN</button>
+        <button class="b-warn" data-cmd="finalize" data-phase="5" data-confirm="1">FINALIZE</button>
+        <button class="b-stop" data-cmd="cancel" data-phase="7" data-confirm="1">EMERGENCY STOP</button>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+  var PHASES = {3:'LIVE',4:'PAUSED',5:'FINALIZING',6:'FINAL',7:'CANCELLED'};
+  var logEl = document.getElementById('log');
+  function log(s){ logEl.insertAdjacentHTML('afterbegin','&raquo; '+s+'<br>'); }
+
+  // demo slate
+  var statuses=[['ok','OPENED'],['ok','OPENED'],['ok','OPENED'],['ok','OPENED'],['ok','OPENED'],
+    ['ok','OPENED'],['ok','OPENED'],['ok','OPENED'],['go','OPENING'],['wait','CONFIRMED']];
+  var slate=document.getElementById('slate');
+  for(var i=0;i<20;i++){
+    var st = statuses[i] || ['wait','CONFIRMED'];
+    var d=document.createElement('div'); d.className='memo';
+    d.innerHTML='<span class="id">memo_'+String(i+1).padStart(2,'0')+'</span>'+
+      '<span>'+['Elite','Legendary','Grail'][i%3]+'</span>'+
+      '<span class="pill '+st[0]+'">'+st[1]+'</span>';
+    slate.appendChild(d);
+  }
+
+  document.querySelectorAll('button[data-cmd]').forEach(function(btn){
+    btn.onclick=function(){
+      var cmd=btn.getAttribute('data-cmd');
+      if(btn.getAttribute('data-confirm') && !confirm('Confirm "'+cmd.toUpperCase()+'"? This is logged and requires step-up auth.')) return;
+      // In production: POST /v1/admin/contests/:id/<cmd> (backend enforces state machine + auth).
+      var ph=btn.getAttribute('data-phase');
+      if(ph){
+        document.getElementById('phase').textContent = PHASES[ph]||'LIVE';
+        // drive the 3D venue phase via the room task bridge
+        if(window.PortalsSdk&&PortalsSdk.sendMessageToUnity){
+          try{ PortalsSdk.sendMessageToUnity(JSON.stringify({
+            TaskName:'30_live_show', TaskTargetState: ph==='3'?'SetNotActiveToActive':'SetActiveToNotActive' })); }catch(e){}
+        }
+      }
+      log(cmd+' issued');
+    };
+  });
+  log('console ready');
+})();
+</script>
+</body>
+</html>

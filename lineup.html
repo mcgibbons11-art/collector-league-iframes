@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rip Night — Your Collection & Team</title>
+<script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+<script src="league-data.js"></script>
+<script src="cl-kit.js"></script>
+<style>
+  body{padding:0}
+  .wrap{max-width:820px;margin:0 auto}
+  .intro{background:rgba(255,255,255,.72);border-bottom:1px solid var(--line);padding:11px 16px;font-size:14px;font-weight:600;color:#4a3a44;line-height:1.4}
+  .intro b{color:#E3350D}
+  .body{padding:12px 14px 0}
+  .sec{display:flex;align-items:center;gap:10px;margin:10px 2px 8px}
+  .sec .h{font-family:'Baloo 2';font-weight:800;font-size:14px;letter-spacing:.4px;color:#241a22}
+  .sec .tag{font-weight:800;font-size:13px;color:#E3350D;background:#fff;border:1px solid #f0dde3;border-radius:8px;padding:2px 9px}
+  .sec .tag.val{color:#a06600;background:#fff7d6;border-color:#ffe49a}
+  .sec .sp{flex:1}
+  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .team .cell{position:relative;cursor:pointer}
+  .team .cell .x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#E3350D;color:#fff;font-weight:800;font-size:13px;display:none;align-items:center;justify-content:center;z-index:2;box-shadow:0 2px 5px rgba(0,0,0,.3)}
+  .team .cell.filled:hover .x{display:flex}
+  .coll{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .coll .cell{cursor:pointer;transition:transform .08s}
+  .coll .cell:hover{transform:translateY(-3px)}
+  .coll .cell.used{opacity:.32;pointer-events:none}
+  .coll .cell .add{position:absolute;inset:auto 0 0 0;text-align:center;background:rgba(227,53,13,.92);color:#fff;font-weight:800;font-size:11px;padding:3px;border-radius:0 0 12px 12px;opacity:0;transition:opacity .1s}
+  .coll .cell:hover .add{opacity:1}
+  .cell{position:relative}
+  .lockbar{display:flex;gap:10px;align-items:center;padding:14px}
+  .btn-sm{font-family:'Baloo 2';font-weight:800;border:none;border-radius:11px;padding:9px 15px;font-size:14px;cursor:pointer;color:#fff;background:linear-gradient(160deg,#34cdec,#1f9bbf);box-shadow:0 4px 0 #16708c}
+  .btn-sm:active{transform:translateY(2px);box-shadow:0 2px 0 #16708c}
+  .empty{grid-column:1/-1;text-align:center;color:#9a8e95;font-weight:600;padding:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="cl-panel">
+  <div class="cl-bar"><span class="t">YOUR COLLECTION &amp; TEAM</span><span class="s" id="wk">This week</span></div>
+  <div class="intro">Open packs to collect cards. Lock a <b>5-card fantasy team</b> from your collection. At week's end your <b>team value = the sum of your 5 cards</b> &mdash; highest value wins the week and a leaderboard point.</div>
+  <div class="body">
+    <div class="sec"><span class="h">YOUR TEAM</span><span class="tag" id="tcount">0 / 5</span><span class="tag val" id="tval">$0</span></div>
+    <div class="grid team" id="team"></div>
+    <div class="sec"><span class="h">YOUR COLLECTION</span><span class="tag" id="ccount">0 cards</span><span class="sp"></span><button class="btn-sm" id="open">Open a pack</button></div>
+    <div class="grid coll" id="coll"></div>
+  </div>
+  <div class="lockbar"><button class="cl-btn lg" id="lock" disabled>Pick 5 cards to lock your team</button></div>
+</div>
+</div>
+<script>
+(function(){
+  var POOL=window.CL_POOL||[], collection=(window.CL_COLLECTION||[]).slice();
+  var teamEl=document.getElementById('team'), collEl=document.getElementById('coll'),
+      tcEl=document.getElementById('tcount'), tvEl=document.getElementById('tval'), ccEl=document.getElementById('ccount'),
+      lockEl=document.getElementById('lock'), wkEl=document.getElementById('wk');
+  if(window.CL_WEEK) wkEl.textContent='Week '+window.CL_WEEK.n+' lineup';
+  var team=[];   // array of collection indices
+
+  function val(i){ return collection[i].value; }
+  function render(){
+    // team slots (5)
+    var html='';
+    for(var s=0;s<5;s++){
+      var ci=team[s];
+      if(ci===undefined) html+='<div class="cell">'+CL.card({},{ghost:true,label:'Slot '+(s+1)})+'</div>';
+      else html+='<div class="cell filled" data-slot="'+s+'"><div class="x">&times;</div>'+CL.card(collection[ci])+'</div>';
+    }
+    teamEl.innerHTML=html;
+    Array.prototype.forEach.call(teamEl.querySelectorAll('.cell.filled'),function(el){ el.onclick=function(){ team.splice(Number(el.getAttribute('data-slot')),1); render(); }; });
+    // collection
+    if(!collection.length){ collEl.innerHTML='<div class="empty">No cards yet. Hit "Open a pack" to start collecting.</div>'; }
+    else collEl.innerHTML=collection.map(function(c,i){
+      var used=team.indexOf(i)>=0;
+      return '<div class="cell'+(used?' used':'')+'" data-i="'+i+'">'+CL.card(c)+'<div class="add">+ Add</div></div>';
+    }).join('');
+    Array.prototype.forEach.call(collEl.querySelectorAll('.cell'),function(el){ el.onclick=function(){ var i=Number(el.getAttribute('data-i')); if(team.indexOf(i)<0 && team.length<5){ team.push(i); render(); } }; });
+    // tallies
+    var tot=team.reduce(function(s,i){return s+val(i);},0);
+    tcEl.textContent=team.length+' / 5'; tvEl.textContent='$'+tot.toLocaleString(); ccEl.textContent=collection.length+' cards';
+    lockEl.disabled=team.length!==5;
+    lockEl.textContent=team.length===5?('Lock team ($'+tot.toLocaleString()+')'):('Pick '+(5-team.length)+' more card'+(5-team.length===1?'':'s'));
+  }
+  document.getElementById('open').onclick=function(){
+    // open a pack: 3 rarity-weighted pulls from the pool
+    var w={COMMON:50,UNCOMMON:25,RARE:18,EPIC:7}, bag=[]; POOL.forEach(function(c){ for(var k=0;k<(w[c.rarityKey]||10);k++) bag.push(c); });
+    for(var n=0;n<3;n++){ collection.push(bag[Math.floor(Math.random()*bag.length)]); }
+    collection.sort(function(a,b){return b.value-a.value;});
+    render();
+  };
+  lockEl.onclick=function(){
+    if(lockEl.disabled) return;
+    var ids=team.map(function(i){return collection[i].id;}).join(',');
+    if(window.PortalsSdk){ try{ PortalsSdk.sendMessageToUnity(JSON.stringify({type:'team_lock',team:ids})); }catch(e){} try{ PortalsSdk.closeIframe(); }catch(e){} }
+    lockEl.textContent='Team locked for the week'; lockEl.disabled=true;
+  };
+  render();
+})();
+</script>
+</body>
+</html>
