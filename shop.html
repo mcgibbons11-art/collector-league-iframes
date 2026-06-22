@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rip Night — Pack Shop</title>
+<script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+<script src="cl-kit.js"></script>
+<script src="cl-api.js"></script>
+<style>
+  body{padding:0}
+  .wrap{max-width:760px;margin:0 auto}
+  .intro{background:rgba(255,255,255,.72);border-bottom:1px solid var(--line);padding:11px 16px;font-size:14px;font-weight:600;color:#4a3a44;line-height:1.4}
+  .intro b{color:#E3350D}
+  .body{padding:12px 14px 6px}
+  .credits{font-weight:800;font-size:13px;color:#5a4500;background:#fff7d6;border:1px solid #ffe49a;border-radius:9px;padding:3px 10px}
+  .machines{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:6px}
+  .mc{position:relative;border-radius:16px;padding:14px 12px 12px;text-align:center;color:#fff;box-shadow:0 10px 24px rgba(0,0,0,.22),inset 0 0 0 2px rgba(255,255,255,.35)}
+  .mc.elite{background:linear-gradient(165deg,#3b82d6,#1f5fb0)}
+  .mc.legendary{background:linear-gradient(165deg,#7a52f0,#4f2fb0)}
+  .mc.grail{background:linear-gradient(165deg,#ff9a2a,#e06a10)}
+  .mc .nm{font-family:'Baloo 2';font-weight:800;font-size:18px;letter-spacing:.4px;text-shadow:0 2px 4px rgba(0,0,0,.3)}
+  .mc .pk{font-size:11px;font-weight:700;opacity:.92;margin-top:2px}
+  .mc .odds{font-size:10.5px;font-weight:700;background:rgba(0,0,0,.28);border-radius:8px;padding:5px 6px;margin:9px 0;line-height:1.5}
+  .mc .price{font-family:'Baloo 2';font-weight:800;font-size:15px;margin-bottom:8px}
+  .mc button{font-family:'Baloo 2';font-weight:800;border:none;border-radius:11px;padding:9px 12px;font-size:14px;cursor:pointer;width:100%;color:#3a2600;background:linear-gradient(#ffe07a,#e0922a);box-shadow:0 4px 0 rgba(0,0,0,.25)}
+  .mc button:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.25)}
+  .mc button:disabled{background:rgba(255,255,255,.35);color:rgba(255,255,255,.7);box-shadow:none;cursor:not-allowed}
+  .sec{display:flex;align-items:center;gap:10px;margin:14px 2px 8px}
+  .sec .h{font-family:'Baloo 2';font-weight:800;font-size:14px;letter-spacing:.4px;color:#241a22}
+  .sec .sp{flex:1}
+  .rips{padding:0 2px 12px}
+  .rip{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #f3e6eb;border-radius:11px;padding:7px 10px;margin-bottom:6px}
+  .rip .who{font-weight:700;font-size:13px;color:#2a1f28;flex:none;min-width:74px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rip .cards{display:flex;gap:5px;flex:1;flex-wrap:wrap}
+  .rip .pill{font-size:11px;font-weight:800;color:#fff;border-radius:7px;padding:2px 7px}
+  .msg{padding:26px 18px;text-align:center;color:#7a6f76;font-weight:600;line-height:1.5}
+  .msg code{background:#fff;border:1px solid #eddfe5;border-radius:6px;padding:1px 6px;font-size:12px;color:#b5260a}
+  /* reveal */
+  .rev{position:fixed;inset:0;background:rgba(22,8,16,.74);display:none;align-items:center;justify-content:center;z-index:60;padding:16px}
+  .rev.on{display:flex}
+  .revbox{background:radial-gradient(120% 90% at 50% 0%,#fff,#ffeef3 70%);border-radius:20px;padding:18px 18px 16px;max-width:460px;width:100%;text-align:center;box-shadow:0 22px 60px rgba(0,0,0,.5),0 0 0 3px var(--gold),0 0 0 6px #ffe9a0}
+  .revh{font-family:'Baloo 2';font-weight:800;font-size:20px;color:#E3350D;margin-bottom:3px}
+  .revsub{font-size:12px;font-weight:700;color:#8a7f86;margin-bottom:14px}
+  .revcards{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:16px}
+  .revcards .cell{animation:pop .45s cubic-bezier(.2,1.3,.5,1) both}
+  @keyframes pop{0%{transform:scale(.55) rotate(-6deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="cl-panel">
+  <div class="cl-bar"><span class="t">RIP NIGHT &mdash; PACK SHOP</span><span class="credits" id="credits">&hellip;</span></div>
+  <div class="intro">Buy and rip Collector Crypt packs. The cards you pull go to <b>your collection</b> &mdash; then build your 5-card team at the <b>Build Team</b> desk. Better machines have better odds. <span id="simnote"></span></div>
+  <div class="body" id="body">
+    <div class="machines" id="machines"></div>
+    <div class="sec"><span class="h">RECENT RIPS</span><span class="sp"></span></div>
+    <div class="rips" id="rips"></div>
+  </div>
+</div>
+</div>
+<div class="rev" id="rev"><div class="revbox">
+  <div class="revh" id="revh">You opened a pack!</div>
+  <div class="revsub" id="revsub">added to your collection</div>
+  <div class="revcards" id="revcards"></div>
+  <button class="cl-btn lg" id="revok">Add to collection</button>
+</div></div>
+<script>
+(function(){
+  var creditsEl=document.getElementById('credits'), machinesEl=document.getElementById('machines'),
+      ripsEl=document.getElementById('rips'), bodyEl=document.getElementById('body'),
+      revEl=document.getElementById('rev'), revCardsEl=document.getElementById('revcards'),
+      revhEl=document.getElementById('revh'), revsubEl=document.getElementById('revsub');
+  var RAR_COLOR={EPIC:'#cf9a1c',RARE:'#7A52F0',UNCOMMON:'#3B7DF0',COMMON:'#8A94A6'};
+  var machines=[];
+
+  if(!window.CLAPI || !CLAPI.configured){
+    bodyEl.innerHTML='<div class="msg">Pack shop is not connected yet.<br>Deploy the Cloudflare Worker (see <code>cloudflare/SETUP.md</code>) and set its URL via <code>?api=</code> on this iframe.</div>';
+    creditsEl.textContent='offline';
+    return;
+  }
+  document.getElementById('simnote').innerHTML='<b>(Simulated credits)</b>';
+
+  function setCredits(n){ creditsEl.textContent=Number(n).toLocaleString()+' credits'; }
+  function oddsLine(o){ return 'Epic '+(o.EPIC||0)+'% · Rare '+(o.RARE||0)+'% · Unc '+(o.UNCOMMON||0)+'% · Com '+(o.COMMON||0)+'%'; }
+
+  function renderMachines(){
+    var credits=CLAPI.player().credits;
+    machinesEl.innerHTML=machines.map(function(m){
+      var afford=credits>=m.price;
+      return '<div class="mc '+m.code+'"><div class="nm">'+m.code.toUpperCase()+'</div><div class="pk">'+m.size+'-card pack</div>'
+        +'<div class="odds">'+oddsLine(m.odds)+'</div><div class="price">'+m.price.toLocaleString()+' cr</div>'
+        +'<button data-m="'+m.code+'"'+(afford?'':' disabled')+'>'+(afford?'Rip pack':'Need '+(m.price-credits).toLocaleString()+' more')+'</button></div>';
+    }).join('');
+    Array.prototype.forEach.call(machinesEl.querySelectorAll('button[data-m]'),function(b){ b.onclick=function(){ rip(b.getAttribute('data-m')); }; });
+  }
+  function rip(code){
+    Array.prototype.forEach.call(machinesEl.querySelectorAll('button'),function(b){b.disabled=true;});
+    CLAPI.buy(code).then(function(res){
+      if(!res||res.error){ renderMachines(); if(res&&res.error==='insufficient_credits'){ /* button already shows */ } return; }
+      setCredits(res.credits); CLAPI.player().credits=res.credits;
+      showReveal(res.cards); renderMachines(); renderRips();
+    }).catch(function(){ renderMachines(); });
+  }
+  function showReveal(cards){
+    var views=cards.map(CLAPI.cardView);
+    var best=views.slice().sort(function(a,b){return b.value-a.value;})[0];
+    revhEl.textContent = best.rarityKey==='EPIC'?'EPIC PULL!':(best.rarityKey==='RARE'?'Nice — a Rare!':'You opened a pack!');
+    revsubEl.textContent = cards.length+' cards added to your collection';
+    revCardsEl.innerHTML=views.map(function(c,i){ return '<div class="cell" style="animation-delay:'+(i*0.12)+'s">'+CL.card(c)+'</div>'; }).join('');
+    revEl.classList.add('on');
+  }
+  document.getElementById('revok').onclick=function(){ revEl.classList.remove('on'); };
+
+  function renderRips(){
+    CLAPI.rips(12).then(function(r){
+      var rips=(r&&r.rips)||[];
+      if(!rips.length){ ripsEl.innerHTML='<div class="msg" style="padding:14px">No packs ripped yet. Be the first.</div>'; return; }
+      ripsEl.innerHTML=rips.map(function(rip){
+        var pills=rip.cards.map(function(c){ return '<span class="pill" style="background:'+(RAR_COLOR[c.rarity]||'#8A94A6')+'">'+c.name+'</span>'; }).join('');
+        return '<div class="rip"><span class="who">'+rip.player+'</span><span class="cards">'+pills+'</span></div>';
+      }).join('');
+    });
+  }
+
+  CLAPI.ensurePlayer().then(function(p){
+    if(!p||!p.id){ bodyEl.innerHTML='<div class="msg">Could not reach the pack shop server. Check the API URL.</div>'; return; }
+    setCredits(p.credits);
+    return CLAPI.machines();
+  }).then(function(m){ if(m){ machines=m.machines; renderMachines(); renderRips(); } })
+    .catch(function(){ bodyEl.innerHTML='<div class="msg">Could not reach the pack shop server. Check the API URL.</div>'; });
+})();
+</script>
+</body>
+</html>

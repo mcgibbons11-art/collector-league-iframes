@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rip Night — Standings</title>
 <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
-<script src="league-data.js"></script>
 <script src="cl-kit.js"></script>
+<script src="cl-api.js"></script>
 <style>
   body{padding:0}
   .wrap{width:340px;margin:0 auto}
@@ -17,12 +17,14 @@
   .list{padding:0 9px}
   .row{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:10px;margin-bottom:4px;background:#fff;border:1px solid #f3e6eb}
   .row.me{background:#fff4f2;border-color:#ffc2b6}
+  .row.me .nm:after{content:' YOU';color:#E3350D;font-size:10px;font-weight:800}
   .row .rk{width:22px;height:22px;border-radius:50%;background:#efe7eb;color:#7a6f76;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;flex:none}
   .row.t1 .rk{background:#FFCB05;color:#5a4500}.row.t2 .rk{background:#cdd3da;color:#3a4350}.row.t3 .rk{background:#e6a062;color:#fff}
   .row .nm{flex:1;font-weight:700;font-size:14px;color:#2a1f28;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .row .vv{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:#a06600}
   .row .pt{font-weight:800;font-size:13px;color:#5a4500;background:#fff7d6;border:1px solid #ffe49a;border-radius:8px;padding:2px 9px;font-variant-numeric:tabular-nums}
   .row .win{font-size:10px;font-weight:800;color:#2FA84C;margin-left:4px}
+  .empty{color:#b3a7ae;font-weight:600;font-size:12px;text-align:center;padding:10px}
   .gap{height:6px}
 </style>
 </head>
@@ -41,32 +43,32 @@
 <script>
 (function(){
   var weekEl=document.getElementById('week'), seasonEl=document.getElementById('season'), wkEl=document.getElementById('wk');
+  var myName=localStorage.getItem('cl_player_name');
+  function me(n){ return myName && n===myName; }
   function rk(i){ return '<div class="rk">'+(i+1)+'</div>'; }
   function renderWeek(n,rows){
     if(n) wkEl.textContent='Week '+n;
+    if(!rows.length){ weekEl.innerHTML='<div class="empty">No locked teams yet this week.</div>'; return; }
     weekEl.innerHTML=rows.map(function(r,i){
-      return '<div class="row'+(i<3?' t'+(i+1):'')+(r.me?' me':'')+'"><div class="rk" '+(i<3?'':'')+'>'+(i+1)+'</div><div class="nm">'+r.name+(i===0?'<span class="win">WINS WEEK</span>':'')+'</div><div class="vv">$'+r.value.toLocaleString()+'</div></div>';
+      return '<div class="row'+(i<3?' t'+(i+1):'')+(me(r.name)?' me':'')+'">'+rk(i)+'<div class="nm">'+r.name+(i===0?'<span class="win">WINS WEEK</span>':'')+'</div><div class="vv">$'+r.value.toLocaleString()+'</div></div>';
     }).join('');
   }
   function renderSeason(rows){
+    if(!rows.length){ seasonEl.innerHTML='<div class="empty">No points yet &mdash; settle a week to award the first.</div>'; return; }
     seasonEl.innerHTML=rows.map(function(r,i){
-      return '<div class="row'+(i<3?' t'+(i+1):'')+(r.me?' me':'')+'">'+rk(i)+'<div class="nm">'+r.name+'</div><div class="pt">'+r.pts+' pt'+(r.pts===1?'':'s')+'</div></div>';
+      return '<div class="row'+(i<3?' t'+(i+1):'')+(me(r.name)?' me':'')+'">'+rk(i)+'<div class="nm">'+r.name+'</div><div class="pt">'+r.pts+' pt'+(r.pts===1?'':'s')+'</div></div>';
     }).join('');
   }
-  function parse(p){ return p.split('|').map(function(x){var a=x.split('~');return{name:a[0]||'?',v:Number(a[1])||0};}); }
-  function handle(s){
-    if(s.indexOf('week_')===0){ wkEl.textContent='Week '+s.substring(5); }
-    else if(s.indexOf('teamvals_')===0) renderWeek(null, parse(s.substring(9)).map(function(x){return{name:x.name,value:x.v};}));
-    else if(s.indexOf('season_')===0) renderSeason(parse(s.substring(7)).map(function(x){return{name:x.name,pts:x.v};}));
+
+  if(!window.CLAPI || !CLAPI.configured){ wkEl.textContent='offline'; weekEl.innerHTML='<div class="empty">Backend not connected.</div>'; return; }
+  function load(){
+    Promise.all([CLAPI.state(), CLAPI.standings(), CLAPI.season()]).then(function(r){
+      var state=r[0], st=r[1], se=r[2];
+      renderWeek(state.current_week, (st.rows||[]).map(function(x){return{name:x.display_name,value:x.total_value};}));
+      renderSeason((se.rows||[]).map(function(x){return{name:x.display_name,pts:x.points};}));
+    }).catch(function(){});
   }
-  if(window.PortalsSdk&&PortalsSdk.setMessageListener){
-    PortalsSdk.setMessageListener(function(m){var s=(typeof m==='string')?m:JSON.stringify(m);try{var j=JSON.parse(m);if(typeof j==='string')s=j;}catch(e){} handle(s);});
-    try{PortalsSdk.sendMessageToUnity(JSON.stringify({TaskName:'scoreboard_ready',TaskTargetState:'SetNotActiveToCompleted'}));}catch(e){}
-  }
-  // standalone seed from the sim
-  var wk=window.CL_WEEK||{n:1,rows:[]}, season=window.CL_SEASON||[];
-  renderWeek(wk.n, (wk.rows||[]).map(function(r){return{name:r.player,value:r.value};}));
-  renderSeason(season.map(function(r){return{name:r.player,pts:r.pts};}));
+  load(); setInterval(load, 15000);
 })();
 </script>
 </body>

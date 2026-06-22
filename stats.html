@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rip Night — Your Stats</title>
+<script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
+<script src="cl-kit.js"></script>
+<script src="cl-api.js"></script>
+<style>
+  body{padding:0}
+  .wrap{max-width:560px;margin:0 auto}
+  .credits{font-weight:800;font-size:13px;color:#5a4500;background:#fff7d6;border:1px solid #ffe49a;border-radius:9px;padding:3px 10px}
+  .body{padding:13px 14px 10px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .stat{background:#fff;border:1px solid #f3e6eb;border-radius:13px;padding:11px 8px;text-align:center}
+  .stat .v{font-family:'Baloo 2';font-weight:800;font-size:21px;color:#E3350D;line-height:1}
+  .stat .l{font-size:10.5px;font-weight:700;color:#8a7f86;margin-top:5px;letter-spacing:.2px}
+  .sec{font-family:'Baloo 2';font-weight:800;font-size:13px;letter-spacing:.4px;color:#241a22;margin:14px 2px 8px;display:flex;align-items:center;gap:9px}
+  .sec .tag{font-weight:800;font-size:12px;color:#a06600;background:#fff7d6;border:1px solid #ffe49a;border-radius:8px;padding:2px 9px}
+  .sec .sp{flex:1}
+  .team{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .rips{display:flex;flex-direction:column;gap:5px}
+  .rip{display:flex;gap:7px;align-items:center;background:#fff;border:1px solid #f3e6eb;border-radius:10px;padding:6px 9px}
+  .rip .mc{font-size:10px;font-weight:800;color:#fff;background:#b06a86;border-radius:6px;padding:2px 6px;text-transform:uppercase;flex:none}
+  .rip .pill{font-size:11px;font-weight:800;color:#fff;border-radius:7px;padding:2px 7px}
+  .empty{color:#b3a7ae;font-weight:600;font-size:12px;text-align:center;padding:12px}
+  .msg{padding:24px 18px;text-align:center;color:#7a6f76;font-weight:600;line-height:1.5}
+  .msg code{background:#fff;border:1px solid #eddfe5;border-radius:6px;padding:1px 6px;font-size:12px;color:#b5260a}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="cl-panel">
+  <div class="cl-bar"><span class="t">YOUR STATS</span><span class="credits" id="credits">&hellip;</span></div>
+  <div class="body" id="body">
+    <div class="stats">
+      <div class="stat"><div class="v" id="s-cards">&ndash;</div><div class="l">CARDS OWNED</div></div>
+      <div class="stat"><div class="v" id="s-value">&ndash;</div><div class="l">COLLECTION $</div></div>
+      <div class="stat"><div class="v" id="s-points">&ndash;</div><div class="l">SEASON PTS</div></div>
+      <div class="stat"><div class="v" id="s-packs">&ndash;</div><div class="l">PACKS RIPPED</div></div>
+    </div>
+    <div class="sec"><span>THIS WEEK&rsquo;S TEAM</span><span class="sp"></span><span class="tag" id="teamtag">&mdash;</span></div>
+    <div class="team" id="team"></div>
+    <div class="sec"><span>YOUR RECENT PULLS</span></div>
+    <div class="rips" id="rips"></div>
+  </div>
+</div>
+</div>
+<script>
+(function(){
+  var RAR_COLOR={EPIC:'#cf9a1c',RARE:'#7A52F0',UNCOMMON:'#3B7DF0',COMMON:'#8A94A6'};
+  var bodyEl=document.getElementById('body');
+  if(!window.CLAPI || !CLAPI.configured){
+    bodyEl.innerHTML='<div class="msg">Not connected yet.<br>Deploy the Cloudflare Worker (<code>cloudflare/SETUP.md</code>) and set its URL via <code>?api=</code>.</div>';
+    document.getElementById('credits').textContent='offline'; return;
+  }
+  function set(id,v){ document.getElementById(id).textContent=v; }
+
+  CLAPI.ensurePlayer().then(function(p){
+    if(!p||!p.id){ bodyEl.innerHTML='<div class="msg">Could not reach the server.</div>'; return; }
+    set('credits', Number(p.credits).toLocaleString()+' credits');
+    return Promise.all([CLAPI.collection(), CLAPI.lineup(), CLAPI.season(), CLAPI.rips(50)]).then(function(r){
+      var coll=(r[0]&&r[0].cards)||[], line=r[1], season=(r[2]&&r[2].rows)||[], rips=(r[3]&&r[3].rips)||[];
+      var myName=CLAPI.player().display_name;
+      var collValue=coll.reduce(function(s,c){return s+c.value;},0);
+      var myPts=(season.filter(function(x){return x.display_name===myName;})[0]||{}).points||0;
+      var myRips=rips.filter(function(x){return x.player===myName;});
+      set('s-cards', coll.length);
+      set('s-value', '$'+collValue.toLocaleString());
+      set('s-points', myPts);
+      set('s-packs', myRips.length);
+
+      var teamEl=document.getElementById('team'), tag=document.getElementById('teamtag');
+      if(line&&line.lineup&&line.entries&&line.entries.length){
+        tag.textContent=(line.lineup.state==='LOCKED'?'LOCKED · ':'draft · ')+'$'+line.lineup.total_value.toLocaleString();
+        teamEl.innerHTML=line.entries.map(function(e){ return '<div>'+CL.card(CLAPI.cardView(e))+'</div>'; }).join('');
+      } else { tag.textContent='not set'; teamEl.innerHTML='<div class="empty" style="grid-column:1/-1">No team this week yet. Build one at the Build Team desk.</div>'; }
+
+      var ripsEl=document.getElementById('rips');
+      if(!myRips.length){ ripsEl.innerHTML='<div class="empty">No packs ripped yet. Hit the Pack Shop.</div>'; }
+      else ripsEl.innerHTML=myRips.slice(0,8).map(function(rp){
+        var pills=rp.cards.map(function(c){ return '<span class="pill" style="background:'+(RAR_COLOR[c.rarity]||'#8A94A6')+'">'+c.name+'</span>'; }).join('');
+        return '<div class="rip"><span class="mc">'+rp.machine+'</span>'+pills+'</div>';
+      }).join('');
+    });
+  }).catch(function(){ bodyEl.innerHTML='<div class="msg">Could not reach the server.</div>'; });
+})();
+</script>
+</body>
+</html>

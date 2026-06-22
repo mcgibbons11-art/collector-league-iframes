@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rip Night — Week Results</title>
 <script src="https://portals-labs.github.io/portals-sdk/portals-sdk.js?v=10005456"></script>
-<script src="league-data.js"></script>
 <script src="cl-kit.js"></script>
+<script src="cl-api.js"></script>
 <style>
   body{padding:0}
   .wrap{max-width:600px;margin:0 auto;position:relative}
@@ -33,13 +33,13 @@
 <body>
 <div class="wrap">
 <div class="cl-panel">
-  <div class="cl-bar"><span class="t" id="title">WEEK CHAMPION</span><span class="s">Rip Night</span></div>
+  <div class="cl-bar"><span class="t" id="title">WEEK RESULTS</span><span class="s">Rip Night</span></div>
   <div class="top">
     <div class="who">
-      <div class="lbl">HIGHEST TEAM VALUE THIS WEEK</div>
-      <div class="nm" id="winner">&mdash;</div>
+      <div class="lbl" id="lbl">HIGHEST TEAM VALUE THIS WEEK</div>
+      <div class="nm" id="winner">&hellip;</div>
       <div class="tv" id="tv"></div>
-      <div class="sub">won the week &rarr; +1 season point</div>
+      <div class="sub" id="sub">won the week &rarr; +1 season point</div>
     </div>
   </div>
   <div class="teamh">WINNING TEAM &mdash; these 5 cards' prices add up to the team value</div>
@@ -52,27 +52,26 @@
 </div>
 <script>
 (function(){
-  var POOL=window.CL_POOL||[], byId={}; POOL.forEach(function(c){byId[c.id]=c;});
-  var byName={}; POOL.forEach(function(c){byName[c.name]=c;});
-  var wk=window.CL_WEEK||{n:1,rows:[]}, season=window.CL_SEASON||[];
   var winnerEl=document.getElementById('winner'), tvEl=document.getElementById('tv'), teamEl=document.getElementById('team'),
-      boardEl=document.getElementById('board'), titleEl=document.getElementById('title');
-
-  titleEl.textContent='WEEK '+wk.n+' CHAMPION';
-  var top=wk.rows&&wk.rows[0];
-  if(top){
-    winnerEl.textContent=top.player;
-    tvEl.textContent='Team value $'+top.value.toLocaleString();
-    teamEl.innerHTML=(top.team||[]).map(function(nm){ var c=byName[nm]; return '<div>'+(c?CL.card(c):'')+'</div>'; }).join('');
-  }
-  boardEl.innerHTML=season.map(function(r,i){
-    return '<div class="row'+(i<3?' t'+(i+1):'')+'"><div class="rk">'+(i+1)+'</div><div class="nm2">'+r.player+'</div><div class="pt">'+r.pts+' pt'+(r.pts===1?'':'s')+'</div></div>';
-  }).join('');
-
+      boardEl=document.getElementById('board'), titleEl=document.getElementById('title'),
+      lblEl=document.getElementById('lbl'), subEl=document.getElementById('sub');
   function confetti(){ var col=['#E3350D','#FFCB05','#30D0E0','#7A52F0','#3DBE5A']; for(var i=0;i<70;i++){ var d=document.createElement('div'); d.className='conf'; d.style.left=(Math.random()*100)+'vw'; d.style.background=col[i%col.length]; d.style.animationDuration=(2.4+Math.random()*2.2)+'s'; d.style.animationDelay=(Math.random()*1.0)+'s'; document.body.appendChild(d); (function(n){setTimeout(function(){n.remove();},6500);})(d); } }
   document.getElementById('next').onclick=function(){ if(window.PortalsSdk&&PortalsSdk.closeIframe){try{PortalsSdk.closeIframe();}catch(e){}} };
-  document.getElementById('share').onclick=function(){ var t='Rip Night — '+winnerEl.textContent+' won week '+wk.n+'!'; if(navigator.share){navigator.share({text:t}).catch(function(){});}else{try{navigator.clipboard.writeText(t);}catch(e){}} };
-  confetti();
+  document.getElementById('share').onclick=function(){ var t='Rip Night — '+winnerEl.textContent+' won the week!'; if(navigator.share){navigator.share({text:t}).catch(function(){});}else{try{navigator.clipboard.writeText(t);}catch(e){}} };
+
+  if(!window.CLAPI || !CLAPI.configured){ winnerEl.textContent='offline'; lblEl.textContent=''; subEl.textContent='Backend not connected.'; return; }
+  Promise.all([CLAPI.results(), CLAPI.season()]).then(function(r){
+    var res=r[0], se=r[1];
+    boardEl.innerHTML=((se&&se.rows)||[]).map(function(x,i){
+      return '<div class="row'+(i<3?' t'+(i+1):'')+'"><div class="rk">'+(i+1)+'</div><div class="nm2">'+x.display_name+'</div><div class="pt">'+x.points+' pt'+(x.points===1?'':'s')+'</div></div>';
+    }).join('');
+    if(!res || !res.winner){ titleEl.textContent='NO WEEK SETTLED YET'; winnerEl.textContent='&mdash;'; lblEl.textContent=''; subEl.textContent='Lock a team, then the weekly settle crowns the winner.'; return; }
+    titleEl.textContent='WEEK '+res.week+' CHAMPION';
+    winnerEl.textContent=res.winner;
+    tvEl.textContent='Team value $'+(res.winnerValue||0).toLocaleString();
+    teamEl.innerHTML=(res.winningTeam||[]).map(function(c){ return '<div>'+CL.card(CLAPI.cardView(c))+'</div>'; }).join('');
+    confetti();
+  }).catch(function(){ winnerEl.textContent='offline'; lblEl.textContent=''; subEl.textContent='Could not reach the server.'; });
 })();
 </script>
 </body>
