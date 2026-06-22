@@ -3,12 +3,18 @@
  *   1. ?api=https://collector-league.<you>.workers.dev  on the iframe URL (the room passes this)
  *   2. localStorage 'cl_api'
  *   3. the CL_API_DEFAULT constant below (edit after `wrangler deploy`)
- * Runs in a normal browser page, so Date.now()/Math.random() are fine here (not the Portals sandbox). */
+ * Runs in a normal browser page, so Date.now()/Math.random() are fine here (not the Portals sandbox).
+ * localStorage is wrapped in LS.get/LS.set: embedded third-party iframes can throw SecurityError on
+ * storage access, which would otherwise kill this whole module (and break every iframe's data). */
 (function () {
   var CL_API_DEFAULT = 'https://collector-league.hughberry.workers.dev';
+  var LS = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  };
   var qp = new URLSearchParams(location.search);
-  if (qp.get('api')) localStorage.setItem('cl_api', qp.get('api'));
-  var BASE = (qp.get('api') || localStorage.getItem('cl_api') || CL_API_DEFAULT).replace(/\/$/, '');
+  if (qp.get('api')) LS.set('cl_api', qp.get('api'));
+  var BASE = (qp.get('api') || LS.get('cl_api') || CL_API_DEFAULT).replace(/\/$/, '');
   var configured = BASE.indexOf('REPLACE-ME') < 0;
 
   function api(path, opts) {
@@ -20,17 +26,16 @@
 
   var player = null;
   function createPlayer() {
-    var name = localStorage.getItem('cl_player_name')
-      || (window.PortalsSdk && PortalsSdk.playerName) || 'Collector';
-    var key = localStorage.getItem('cl_portals_key');
-    if (!key) { key = 'k_' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('cl_portals_key', key); }
+    var name = LS.get('cl_player_name') || (window.PortalsSdk && PortalsSdk.playerName) || 'Collector';
+    var key = LS.get('cl_portals_key');
+    if (!key) { key = 'k_' + Math.random().toString(36).slice(2) + Date.now().toString(36); LS.set('cl_portals_key', key); }
     return post('/player', { display_name: name, portals_key: key }).then(function (p) {
-      if (p && p.id) { localStorage.setItem('cl_player_id', p.id); localStorage.setItem('cl_player_name', p.display_name); player = p; }
+      if (p && p.id) { LS.set('cl_player_id', p.id); LS.set('cl_player_name', p.display_name); player = p; }
       return p;
     });
   }
   function ensurePlayer() {
-    var id = localStorage.getItem('cl_player_id');
+    var id = LS.get('cl_player_id');
     if (!id) return createPlayer();
     return api('/player?id=' + encodeURIComponent(id)).then(function (p) {
       if (p && p.id) { player = p; return p; }
