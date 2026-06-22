@@ -8,24 +8,15 @@
 <script src="cl-kit.js"></script>
 <script src="cl-api.js"></script>
 <style>
-  html,body{background:transparent!important;pointer-events:none}   /* click-through except the widget */
-  /* collapsed: a floating button bottom-right */
-  .tab{position:fixed;right:18px;bottom:18px;pointer-events:auto;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
-       font-family:'Baloo 2',system-ui,sans-serif;font-weight:800;font-size:14px;color:#fff;
-       background:linear-gradient(160deg,#7a52f0,#4f2fb0);border:2px solid #FFCB05;border-radius:13px;padding:10px 15px;box-shadow:0 5px 0 #3a2080,0 8px 16px rgba(0,0,0,.3)}
-  .tab:active{transform:translateY(2px);box-shadow:0 3px 0 #3a2080}
-  .tab .dot{width:9px;height:9px;border-radius:50%;background:#35D0A3;box-shadow:0 0 8px #35D0A3;animation:pulse 1.4s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
-  .tab .n{background:#FFCB05;color:#5a4500;border-radius:7px;font-size:11px;padding:1px 6px;min-width:14px;text-align:center}
-  /* expanded panel above the tab */
-  .panel{position:fixed;right:18px;bottom:66px;width:400px;max-width:94vw;pointer-events:auto;display:none}
-  .panel.on{display:block}
-  body.open .tab{display:none}
+  html,body{background:transparent!important;pointer-events:none}   /* fully click-through; the overlay button controls it */
+  .watch{position:fixed;top:60px;left:50%;transform:translateX(-50%);width:420px;max-width:94vw;display:none}
+  .watch.on{display:block;animation:drop .25s ease both}
+  @keyframes drop{0%{transform:translate(-50%,-8px);opacity:0}100%{transform:translate(-50%,0);opacity:1}}
   .live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800}
   .live .dot{width:9px;height:9px;border-radius:50%;background:#35D0A3;box-shadow:0 0 8px #35D0A3;animation:pulse 1.4s ease-in-out infinite}
-  .x{cursor:pointer;font-weight:800;font-size:17px;color:#fff;background:rgba(0,0,0,.25);border-radius:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+  @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
   .sub{background:rgba(255,255,255,.72);font-size:11px;font-weight:700;color:#6a5560;padding:5px 12px;border-bottom:1px solid #f0dde3}
-  .feed{padding:8px 10px 10px;max-height:54vh;overflow:auto}
+  .feed{padding:8px 10px 11px;max-height:56vh;overflow:auto}
   .rip{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #f3e6eb;border-radius:11px;padding:7px 9px;margin-bottom:6px}
   .rip.fresh{animation:slidein .45s ease both}
   @keyframes slidein{0%{transform:translateY(-7px);opacity:0}100%{transform:none;opacity:1}}
@@ -37,10 +28,9 @@
 </style>
 </head>
 <body>
-<div class="tab" id="tab"><span class="dot"></span>RIP WATCHER<span class="n" id="tabn">&middot;</span></div>
-<div class="panel" id="panel">
+<div class="watch" id="watch">
   <div class="cl-panel">
-    <div class="cl-bar"><span class="t">RIP WATCHER</span><span class="live"><span class="dot"></span>LIVE</span><span class="x" id="close">&times;</span></div>
+    <div class="cl-bar"><span class="t">RIP WATCHER</span><span class="live"><span class="dot"></span>LIVE</span></div>
     <div class="sub">What everyone in the room just pulled.</div>
     <div class="feed" id="feed"><div class="empty">Loading&hellip;</div></div>
   </div>
@@ -49,14 +39,13 @@
 (function(){
   var RAR={EPIC:'#cf9a1c',RARE:'#7A52F0',UNCOMMON:'#3B7DF0',COMMON:'#8A94A6'};
   var MC={elite:'#1f5fb0',legendary:'#4f2fb0',grail:'#e06a10'};
-  var panel=document.getElementById('panel'), feed=document.getElementById('feed'), tabn=document.getElementById('tabn');
-  var seen={}, open=false;
+  var watch=document.getElementById('watch'), feed=document.getElementById('feed');
+  var seen={}, open=false, timer=null;
 
   function render(){
     if(!window.CLAPI || !CLAPI.configured){ feed.innerHTML='<div class="empty">Rip watcher offline.</div>'; return; }
     CLAPI.rips(15).then(function(r){
       var rips=(r&&r.rips)||[];
-      tabn.textContent=rips.length;
       if(!rips.length){ feed.innerHTML='<div class="empty">No packs ripped yet. Be the first at the Pack Shop.</div>'; return; }
       feed.innerHTML=rips.map(function(rp){
         var fresh=!seen[rp.purchase_id]; seen[rp.purchase_id]=true;
@@ -65,19 +54,20 @@
       }).join('');
     }).catch(function(){});
   }
-  function showPanel(){ open=true; panel.classList.add('on'); document.body.classList.add('open'); render(); }
-  function hidePanel(){ open=false; panel.classList.remove('on'); document.body.classList.remove('open'); }
-  document.getElementById('tab').onclick=showPanel;
-  document.getElementById('close').onclick=hidePanel;
+  function show(){ if(open) return; open=true; watch.classList.add('on'); render(); timer=setInterval(render,8000); }
+  function hide(){ open=false; watch.classList.remove('on'); if(timer){clearInterval(timer);timer=null;} }
 
-  // also toggle-able from the room (optional): messages "ripwatch_1"/"ripwatch_0"/"ripwatch_toggle"
-  if(window.PortalsSdk && PortalsSdk.setMessageListener){
-    PortalsSdk.setMessageListener(function(m){ var s=(typeof m==='string')?m:JSON.stringify(m); try{var j=JSON.parse(m); if(typeof j==='string')s=j;}catch(e){}
-      if(s.indexOf('ripwatch_')!==0) return; var v=s.substring(9);
-      if(v==='toggle') (open?hidePanel():showPanel()); else if(v==='1'||v==='show') showPanel(); else hidePanel(); });
+  // The native overlay "Rip watcher" button toggles cl_ripwatch -> the room sends ripwatch_<value> here.
+  function handle(s){
+    if(s.indexOf('ripwatch_')!==0) return;
+    var v=s.substring(9);
+    if(v==='toggle') (open?hide():show()); else if(v==='1'||v==='show') show(); else hide();
   }
-  render();                                   // prime the count on the tab
-  setInterval(function(){ render(); }, 8000); // keep the count + feed fresh
+  if(window.PortalsSdk && PortalsSdk.setMessageListener){
+    PortalsSdk.setMessageListener(function(m){ var s=(typeof m==='string')?m:JSON.stringify(m); try{var j=JSON.parse(m); if(typeof j==='string')s=j;}catch(e){} handle(s); });
+  }
+  // standalone preview: ?show=1
+  if(new URLSearchParams(location.search).get('show')==='1') show();
 })();
 </script>
 </body>
