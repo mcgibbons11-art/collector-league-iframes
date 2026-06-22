@@ -5,7 +5,7 @@
  *   3. the CL_API_DEFAULT constant below (edit after `wrangler deploy`)
  * Runs in a normal browser page, so Date.now()/Math.random() are fine here (not the Portals sandbox). */
 (function () {
-  var CL_API_DEFAULT = 'https://collector-league.REPLACE-ME.workers.dev';
+  var CL_API_DEFAULT = 'https://collector-league.hughberry.workers.dev';
   var qp = new URLSearchParams(location.search);
   if (qp.get('api')) localStorage.setItem('cl_api', qp.get('api'));
   var BASE = (qp.get('api') || localStorage.getItem('cl_api') || CL_API_DEFAULT).replace(/\/$/, '');
